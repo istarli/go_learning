@@ -1,7 +1,8 @@
-package main
-import "fmt"
 // Leetcode 207. Course Schedule 
 // https://leetcode-cn.com/problems/course-schedule/
+
+package main
+import "fmt"
 
 // Solution1 : dfs
 func dfs(v int, matrix [][]int, flag []bool, safe []bool) {
