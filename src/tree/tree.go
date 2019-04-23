@@ -6,6 +6,10 @@ import(
     "mymath"
 )
 
+func init() {
+    fmt.Println("tree.go")
+}
+
 type TreeNode struct {
     Val int
     Left *TreeNode
