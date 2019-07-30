@@ -52,3 +52,15 @@ func TestHeapSort(t *testing.T) {
 	HeapSort(seq)
 	assertEqualIntSlice(t, seq, expect)
 }
+
+func TestMergeSort(t *testing.T) {
+	seq, expect := defaultSeqs()
+	MergeSort(seq)
+	assertEqualIntSlice(t, seq, expect)
+}
+
+func TestMergeSortNR(t *testing.T) {
+	seq, expect := defaultSeqs()
+	MergeSortNR(seq)
+	assertEqualIntSlice(t, seq, expect)
+}

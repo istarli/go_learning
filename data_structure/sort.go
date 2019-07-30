@@ -108,5 +108,55 @@ func Sift(seq []int, k int) {
 }
 
 func Merge(seq1 []int, seq2 []int) {
+	n1, n2 := len(seq1), len(seq2)
+	if n1 >= 0 && n2 >= 0 {
+		i, j, k := 0, 0, 0
+		tmp := make([]int, n1+n2)
+		for i < n1 && j < n2 {
+			if seq1[i] < seq2[j] {
+				tmp[k] = seq1[i]
+				i, k = i+1, k+1
+			} else {
+				tmp[k] = seq2[j]
+				j, k = j+1, k+1
+			}
+		}
+		for i < n1 {
+			tmp[k] = seq1[i]
+			i, k = i+1, k+1
+		}
+		for j < n2 {
+			tmp[k] = seq2[j]
+			j, k = j+1, k+1
+		}
+		for m := 0; m < n1; m++ {
+			seq1[m] = tmp[m]
+		}
+		for m := 0; m < n2; m++ {
+			seq2[m] = tmp[n1+m]
+		}
+	}
+}
 
+func MergeSort(seq []int) {
+	if len(seq) > 1 {
+		mid := len(seq) / 2
+		MergeSort(seq[0:mid])
+		MergeSort(seq[mid:])
+		Merge(seq[0:mid], seq[mid:])
+	}
+}
+
+func MergeSortNR(seq []int) {
+	d, n := 1, len(seq)
+	for d < n {
+		for i := 0; i < n; i += 2 * d {
+			if end, mid := i+2*d, i+d; end <= n {
+				Merge(seq[i:mid], seq[mid:end])
+			} else if mid <= n {
+				Merge(seq[i:mid], seq[mid:])
+			}
+		}
+		d *= 2
+	}
 }
