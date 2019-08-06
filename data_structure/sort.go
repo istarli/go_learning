@@ -14,16 +14,31 @@ func InsertSortCore(seq []int, d int) {
 	}
 }
 
+/*
+	Time Complexity : O(n)~O(n^2), O(n^2)
+	Space Complexity : O(1)
+	Stable.
+*/
 func InsertSort(seq []int) {
 	InsertSortCore(seq, 1)
 }
 
+/*
+	Time Complexity : O(n*log2(n))~O(n^2), O(n^1.3)
+	Space Complexity : O(1)
+	Not Stable.
+*/
 func ShellSort(seq []int) {
 	for d := len(seq) / 2; d > 0; d /= 2 {
 		InsertSortCore(seq, d)
 	}
 }
 
+/*
+	Time Complexity : O(n)~O(n^2), O(n^2)
+	Space Complexity : O(1)
+	Stable.
+*/
 func BubbleSort(seq []int) {
 	pos := len(seq) - 1
 	for pos > 0 {
@@ -38,6 +53,11 @@ func BubbleSort(seq []int) {
 	}
 }
 
+/*
+	Time Complexity : O(n*log2(n))~O(n^2), O(n*log2(2))
+	Space Complexity : O(1)
+	Not Stable.
+*/ 
 func QuickSort(seq []int) {
 	if len(seq) > 0 {
 		k := Partion(seq)
@@ -65,6 +85,12 @@ func Partion(seq []int) int {
 	return i
 }
 
+/*
+	Time Complexity : O(n^2)
+	Space Complexity : O(1)
+	Stable.
+	The least times to move elements.
+*/ 
 func SelectSort(seq []int) {
 	for i := 0; i < len(seq); i++ {
 		minIdx := i
@@ -77,6 +103,11 @@ func SelectSort(seq []int) {
 	}
 }
 
+/*
+	Time Complexity : O(n*log2(n))
+	Space Complexity : O(1)
+	Stable.
+*/ 
 func HeapSort(seq []int) {
 	n := len(seq)
 	// create heap
@@ -104,6 +135,34 @@ func Sift(seq []int, k int) {
 		}
 		seq[i], seq[j] = seq[j], seq[i]
 		i, j = j, 2*j+1
+	}
+}
+
+/*
+	Time Complexity : O(n*log2(n))
+	Space Complexity : O(n)
+	Stable.
+*/ 
+func MergeSort(seq []int) {
+	if len(seq) > 1 {
+		mid := len(seq) / 2
+		MergeSort(seq[0:mid])
+		MergeSort(seq[mid:])
+		Merge(seq[0:mid], seq[mid:])
+	}
+}
+
+func MergeSortNR(seq []int) {
+	d, n := 1, len(seq)
+	for d < n {
+		for i := 0; i < n; i += 2 * d {
+			if end, mid := i+2*d, i+d; end <= n {
+				Merge(seq[i:mid], seq[mid:end])
+			} else if mid <= n {
+				Merge(seq[i:mid], seq[mid:])
+			}
+		}
+		d *= 2
 	}
 }
 
@@ -135,28 +194,5 @@ func Merge(seq1 []int, seq2 []int) {
 		for m := 0; m < n2; m++ {
 			seq2[m] = tmp[n1+m]
 		}
-	}
-}
-
-func MergeSort(seq []int) {
-	if len(seq) > 1 {
-		mid := len(seq) / 2
-		MergeSort(seq[0:mid])
-		MergeSort(seq[mid:])
-		Merge(seq[0:mid], seq[mid:])
-	}
-}
-
-func MergeSortNR(seq []int) {
-	d, n := 1, len(seq)
-	for d < n {
-		for i := 0; i < n; i += 2 * d {
-			if end, mid := i+2*d, i+d; end <= n {
-				Merge(seq[i:mid], seq[mid:end])
-			} else if mid <= n {
-				Merge(seq[i:mid], seq[mid:])
-			}
-		}
-		d *= 2
 	}
 }
