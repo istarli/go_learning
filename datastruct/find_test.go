@@ -1,4 +1,4 @@
-package data_structure
+package datastruct
 
 import (
 	"testing"

@@ -1,4 +1,4 @@
-package data_structure
+package datastruct
 
 func InsertSortCore(seq []int, d int) {
 	// if seq is nil, len(seq) will get zero

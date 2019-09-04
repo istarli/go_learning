@@ -1,4 +1,4 @@
-package data_structure
+package datastruct
 
 func BinarySearch(seq []int, target int) int {
 	low, high := 0, len(seq)
