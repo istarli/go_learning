@@ -29,14 +29,14 @@ func LowerBound(seq []int, target int) int {
 }
 
 func UpperBound(seq []int, target int) int {
-	low, high := -1, len(seq)-1
+	low, high := 0, len(seq)
 	for low < high {
-		mid := high - (high-low)/2
-		if seq[mid] <= target {
-			low = mid
+		mid := low + (high-low)/2
+		if seq[mid] > target {
+			high = mid
 		} else {
-			high = mid - 1
+			low = mid + 1
 		}
 	}
-	return high
+	return low
 }

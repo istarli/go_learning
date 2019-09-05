@@ -27,10 +27,10 @@ func TestLowerBound(t *testing.T) {
 
 func TestUpperBound(t *testing.T) {
 	seq := []int{-1, 3, 5, 7, 8}
-	assert.Equal(t, len(seq)-1, UpperBound(seq, 9))
-	assert.Equal(t, len(seq)-1, UpperBound(seq, 8))
-	assert.Equal(t, 2, UpperBound(seq, 5))
-	assert.Equal(t, 1, UpperBound(seq, 4))
-	assert.Equal(t, 0, UpperBound(seq, -1))
-	assert.Equal(t, -1, UpperBound(seq, -2))
+	assert.Equal(t, 0, UpperBound(seq, -2))
+	assert.Equal(t, 1, UpperBound(seq, -1))
+	assert.Equal(t, 2, UpperBound(seq, 3))
+	assert.Equal(t, 2, UpperBound(seq, 4))
+	assert.Equal(t, len(seq), UpperBound(seq, 8))
+	assert.Equal(t, len(seq), UpperBound(seq, 9))
 }
