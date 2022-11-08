@@ -1,6 +1,7 @@
 package type_transfer
 
 import (
+	"fmt"
 	"github.com/samuel/go-thrift/parser"
 	"github.com/stretchr/testify/assert"
 
@@ -13,5 +14,6 @@ func TestTemp(t *testing.T) {
 	assert.Nil(t, err)
 
 	st := m[s].Structs["ExampleRequest"]
-	GenTypeTransferCode(st)
+	paper := GenStructTypeTransferFunc(st, m)
+	fmt.Println(paper)
 }
