@@ -16,12 +16,28 @@ type StructBuilder struct {
 	Content string
 }
 
-func ParseIDL(filename string) (map[string]*parser.Thrift, string, error) {
+func GenRequestAndResponseTransferFunc(methodName string, filePath, oldPkg, newPkg string) (string, error) {
 	p := &parser.Parser{}
-	return p.ParseFile(filename)
+	thriftTree, absPath, err := p.ParseFile(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	reqSt := thriftTree[absPath].Structs[methodName+"Request"]
+	if reqSt == nil {
+		reqSt = thriftTree[absPath].Structs[methodName+"Req"]
+	}
+	respSt := thriftTree[absPath].Structs[methodName+"Response"]
+	if respSt == nil {
+		respSt = thriftTree[absPath].Structs[methodName+"Resp"]
+	}
+	request := GenStructTypeTransferFunc(reqSt, thriftTree, oldPkg, newPkg)
+	response := GenStructTypeTransferFunc(respSt, thriftTree, newPkg, oldPkg)
+
+	return request + response, nil
 }
 
-func GenStructTypeTransferFunc(root *parser.Struct, stMap map[string]*parser.Thrift, oldPkg, newPkg string) string {
+func GenStructTypeTransferFunc(root *parser.Struct, thriftTree map[string]*parser.Thrift, oldPkg, newPkg string) string {
 	oldPkgName = oldPkg
 	newPkgName = newPkg
 
@@ -31,7 +47,7 @@ func GenStructTypeTransferFunc(root *parser.Struct, stMap map[string]*parser.Thr
 	for pos < len(structBuilderList) {
 		item := structBuilderList[pos]
 		if item.Content == "" {
-			structBuilderList = genStructTypeTransferFuncCore(item, stMap, structBuilderList)
+			structBuilderList = genStructTypeTransferFuncCore(item, thriftTree, structBuilderList)
 		}
 		pos++
 	}
@@ -70,7 +86,7 @@ func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.
 			_, newPkg = transPkgName(valSt, tree)
 			buf.WriteString(withTapAndLF(1, "out.%s = make(map[string]*%s.%s)", field.Name, newPkg, valSt.Name))
 			buf.WriteString(withTapAndLF(1, "for key,val := range in.%s {", field.Name))
-			buf.WriteString(withTapAndLF(2, "out.%s[key] = transTo%s%s(val))", field.Name, toCamel(newPkg), valSt.Name))
+			buf.WriteString(withTapAndLF(2, "out.%s[key] = transTo%s%s(val)", field.Name, toCamel(newPkg), valSt.Name))
 			buf.WriteString(withTapAndLF(1, "}"))
 			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
 		} else {
