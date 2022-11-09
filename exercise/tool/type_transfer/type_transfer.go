@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+var (
+	oldPkgName = "member_query"
+	newPkgName = "member_query_zg"
+)
+
 type StructBuilder struct {
 	St      *parser.Struct
 	Content string
@@ -16,7 +21,10 @@ func ParseIDL(filename string) (map[string]*parser.Thrift, string, error) {
 	return p.ParseFile(filename)
 }
 
-func GenStructTypeTransferFunc(root *parser.Struct, stMap map[string]*parser.Thrift) string {
+func GenStructTypeTransferFunc(root *parser.Struct, stMap map[string]*parser.Thrift, oldPkg, newPkg string) string {
+	oldPkgName = oldPkg
+	newPkgName = newPkg
+
 	structBuilderList := []*StructBuilder{{St: root}}
 
 	pos := 0
@@ -40,19 +48,19 @@ func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.
 	st := node.St
 	var buf strings.Builder
 
-	_, newPkg := transPkgName(st, tree)
-	buf.WriteString(fmt.Sprintf("func transTo%s%s(in *%s.%s) *%s.%s {\n", toCamel(newPkg), st.Name, newPkg, st.Name, newPkg, st.Name))
-	buf.WriteString(fmt.Sprintf("out := %s.New%s()\n", newPkg, st.Name))
+	oldPkg, newPkg := transPkgName(st, tree)
+	buf.WriteString(withTapAndLF(0, "func transTo%s%s(in *%s.%s) *%s.%s {", toCamel(newPkg), st.Name, oldPkg, st.Name, newPkg, st.Name))
+	buf.WriteString(withTapAndLF(1, "out := %s.New%s()", newPkg, st.Name))
 	for _, field := range st.Fields {
 		if isBasicType(field.Type) {
-			buf.WriteString(fmt.Sprintf("out.%s = in.%s\n", field.Name, field.Name))
+			buf.WriteString(withTapAndLF(1, "out.%s = in.%s", field.Name, field.Name))
 		} else if field.Type.Name == "list" {
 			valSt := findInnerStruct(field.Type.ValueType.Name, st, tree)
 			_, newPkg = transPkgName(valSt, tree)
-			buf.WriteString(fmt.Sprintf("out.%s = make([]*%s.%s,0,len(in.%s))\n", field.Name, newPkg, valSt.Name, field.Name))
-			buf.WriteString(fmt.Sprintf("for _,item := range in.%s {\n", field.Name))
-			buf.WriteString(fmt.Sprintf("  out.%s = append(out.%s,transTo%s%s(item))\n", field.Name, field.Name, toCamel(newPkg), valSt.Name))
-			buf.WriteString(fmt.Sprintf("}\n"))
+			buf.WriteString(withTapAndLF(1, "out.%s = make([]*%s.%s,0,len(in.%s))", field.Name, newPkg, valSt.Name, field.Name))
+			buf.WriteString(withTapAndLF(1, "for _,item := range in.%s {", field.Name))
+			buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s,transTo%s%s(item))", field.Name, field.Name, toCamel(newPkg), valSt.Name))
+			buf.WriteString(withTapAndLF(1, "}"))
 			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
 		} else if field.Type.Name == "map" {
 			if field.Type.KeyType.Name != "string" {
@@ -60,19 +68,20 @@ func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.
 			}
 			valSt := findInnerStruct(field.Type.ValueType.Name, st, tree)
 			_, newPkg = transPkgName(valSt, tree)
-			buf.WriteString(fmt.Sprintf("out.%s = make(map[string]*%s.%s)\n", field.Name, newPkg, valSt.Name))
-			buf.WriteString(fmt.Sprintf("for key,val := range in.%s {\n", field.Name))
-			buf.WriteString(fmt.Sprintf("  out.%s[key] = transTo%s%s(val))\n", field.Name, toCamel(newPkg), valSt.Name))
-			buf.WriteString(fmt.Sprintf("}\n"))
+			buf.WriteString(withTapAndLF(1, "out.%s = make(map[string]*%s.%s)", field.Name, newPkg, valSt.Name))
+			buf.WriteString(withTapAndLF(1, "for key,val := range in.%s {", field.Name))
+			buf.WriteString(withTapAndLF(2, "out.%s[key] = transTo%s%s(val))", field.Name, toCamel(newPkg), valSt.Name))
+			buf.WriteString(withTapAndLF(1, "}"))
 			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
 		} else {
 			valSt := findInnerStruct(field.Type.Name, st, tree)
 			_, newPkg = transPkgName(valSt, tree)
-			buf.WriteString(fmt.Sprintf("out.%s = transTo%s%s(in.%s)\n", field.Name, toCamel(newPkg), valSt.Name, field.Name))
+			buf.WriteString(withTapAndLF(1, "out.%s = transTo%s%s(in.%s)", field.Name, toCamel(newPkg), valSt.Name, field.Name))
 			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
 		}
 	}
-	buf.WriteString("return out\n}\n\n")
+	buf.WriteString(withTapAndLF(1, "return out"))
+	buf.WriteString(withTapAndLF(0, "}\n"))
 
 	node.Content = buf.String()
 	return structBuiderList
@@ -81,7 +90,7 @@ func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.
 // isBasicType i32 bool string list<x> map<x,x>  include.x
 func isBasicType(t *parser.Type) bool {
 	switch t.Name {
-	case "i32", "bool", "string":
+	case "i32", "i64", "bool", "string":
 		return true
 	case "list":
 		return isBasicType(t.ValueType)
@@ -96,8 +105,7 @@ func isBasicType(t *parser.Type) bool {
 }
 
 func transPkgName(st *parser.Struct, thriftTree map[string]*parser.Thrift) (string, string) {
-	pkgName := getPkgName(st, thriftTree)
-	return pkgName, pkgName + "_new"
+	return oldPkgName, newPkgName
 }
 
 // todo 不支持嵌套idl的重名结构体
@@ -147,4 +155,12 @@ func toUpper(c byte) byte {
 		return c - ('a' - 'A')
 	}
 	return c
+}
+
+func withTapAndLF(tapNum int, format string, a ...any) string {
+	prefix := ""
+	for i := 0; i < tapNum; i++ {
+		prefix += "\t"
+	}
+	return prefix + fmt.Sprintf(format, a...) + "\n"
 }
