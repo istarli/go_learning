@@ -11,9 +11,18 @@ var (
 	newPkgName = "member_query_zg"
 )
 
-type StructBuilder struct {
-	St      *parser.Struct
-	Content string
+const (
+	BuilderTypeBasic = iota
+	BuilderTypeStruct
+	BuilderTypeList
+	BuilderTypeMap
+)
+
+type BuilderNode struct {
+	BuilderType int
+	St          *parser.Struct
+	Typ         *parser.Type
+	Content     string
 }
 
 func GenRequestAndResponseTransferFunc(methodName string, filePath, oldPkg, newPkg string) (string, error) {
@@ -41,7 +50,7 @@ func GenStructTypeTransferFunc(root *parser.Struct, thriftTree map[string]*parse
 	oldPkgName = oldPkg
 	newPkgName = newPkg
 
-	structBuilderList := []*StructBuilder{{St: root}}
+	structBuilderList := []*BuilderNode{{St: root}}
 
 	pos := 0
 	for pos < len(structBuilderList) {
@@ -60,51 +69,79 @@ func GenStructTypeTransferFunc(root *parser.Struct, thriftTree map[string]*parse
 	return buf.String()
 }
 
-func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.Thrift, structBuiderList []*StructBuilder) []*StructBuilder {
-	st := node.St
-	var buf strings.Builder
+func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Thrift, structBuiderList []*BuilderNode) []*BuilderNode {
+	oldPkg, newPkg := transPkgName()
+	oldType, newType := unpackType(node.Typ, oldPkg), unpackType(node.Typ, newPkg)
+	title := genTitle(newPkg, node.Typ)
 
-	oldPkg, newPkg := transPkgName(st, tree)
-	buf.WriteString(withTapAndLF(0, "func transTo%s%s(in *%s.%s) *%s.%s {", toCamel(newPkg), st.Name, oldPkg, st.Name, newPkg, st.Name))
+	var buf strings.Builder
+	buf.WriteString(withTapAndLF(0, "func transTo%s(in %s) %s {", title, oldType, newType))
 	buf.WriteString(withTapAndLF(1, "if in == nil {"))
 	buf.WriteString(withTapAndLF(2, "return nil"))
 	buf.WriteString(withTapAndLF(1, "}"))
-	buf.WriteString(withTapAndLF(1, "out := %s.New%s()", newPkg, st.Name))
-	for _, field := range st.Fields {
-		if isBasicType(field.Type) {
-			buf.WriteString(withTapAndLF(1, "out.%s = in.%s", field.Name, field.Name))
-		} else if field.Type.Name == "list" {
-			valSt := findInnerStruct(field.Type.ValueType.Name, st, tree)
-			_, newPkg = transPkgName(valSt, tree)
-			buf.WriteString(withTapAndLF(1, "out.%s = make([]*%s.%s,0,len(in.%s))", field.Name, newPkg, valSt.Name, field.Name))
-			buf.WriteString(withTapAndLF(1, "for _,item := range in.%s {", field.Name))
-			buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s,transTo%s%s(item))", field.Name, field.Name, toCamel(newPkg), valSt.Name))
-			buf.WriteString(withTapAndLF(1, "}"))
-			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
-		} else if field.Type.Name == "map" {
-			if field.Type.KeyType.Name != "string" {
-				panic("仅支持map<string,x>类型") // todo 仅支持map<string,x>类型
 
-			}
-			if field.Type.ValueType.Name == "map" || field.Type.ValueType.Name == "list" {
-				panic("不支持map、list嵌套类型") // todo 不支持map、list嵌套类型
-			}
-			valSt := findInnerStruct(field.Type.ValueType.Name, st, tree)
-			_, newPkg = transPkgName(valSt, tree)
-			buf.WriteString(withTapAndLF(1, "out.%s = make(map[string]*%s.%s)", field.Name, newPkg, valSt.Name))
-			buf.WriteString(withTapAndLF(1, "for key,val := range in.%s {", field.Name))
-			buf.WriteString(withTapAndLF(2, "out.%s[key] = transTo%s%s(val)", field.Name, toCamel(newPkg), valSt.Name))
-			buf.WriteString(withTapAndLF(1, "}"))
-			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
-		} else {
-			valSt := findInnerStruct(field.Type.Name, st, tree)
-			_, newPkg = transPkgName(valSt, tree)
-			buf.WriteString(withTapAndLF(1, "out.%s = transTo%s%s(in.%s)", field.Name, toCamel(newPkg), valSt.Name, field.Name))
-			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
+	switch node.BuilderType {
+	case BuilderTypeStruct:
+		st := node.St
+		if st == nil {
+			panic("struct is nil")
 		}
+		buf.WriteString(withTapAndLF(1, "out := %s.New%s()", newPkg, st.Name))
+		for _, field := range st.Fields {
+			if isBasicType(field.Type) {
+				buf.WriteString(withTapAndLF(1, "out.%s = in.%s", field.Name, field.Name))
+			} else {
+				if field.Type.Name == "list" {
+					builderType := getBuilderType(field.Type.ValueType)
+					innerType := unpackType(field.Type.ValueType, newPkg)
+					innerTitle := genTitle(newPkg, field.Type.ValueType)
+
+					buf.WriteString(withTapAndLF(1, "out.%s = make([]*%s,0)", field.Name, innerType))
+					buf.WriteString(withTapAndLF(1, "for _,item := range in.%s {", field.Name))
+					buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s,transTo%s(item))", field.Name, field.Name, innerTitle))
+					buf.WriteString(withTapAndLF(1, "}"))
+
+					structBuiderList = append(structBuiderList, &BuilderNode{
+						BuilderType: builderType,
+						Typ:         field.Type.ValueType,
+					})
+				} else if field.Type.Name == "map" {
+					if field.Type.KeyType.Name != "string" {
+						panic("仅支持map<string,x>类型") // todo 仅支持map<string,x>类型
+					}
+					builderType := getBuilderType(field.Type.ValueType)
+					innerType := unpackType(field.Type.ValueType, newPkg)
+					innerTitle := genTitle(newPkg, field.Type.ValueType)
+
+					buf.WriteString(withTapAndLF(1, "out.%s = make(map[string]%s)", field.Name, innerType))
+					buf.WriteString(withTapAndLF(1, "for key,val := range in.%s {", field.Name))
+					buf.WriteString(withTapAndLF(2, "out.%s[key] = transTo%s(val)", field.Name, innerTitle))
+					buf.WriteString(withTapAndLF(1, "}"))
+
+					structBuiderList = append(structBuiderList, &BuilderNode{
+						BuilderType: builderType,
+						Typ:         field.Type.ValueType,
+					})
+				} else {
+					stTitle := genTitle(newPkg, field.Type)
+
+					buf.WriteString(withTapAndLF(1, "out.%s = transTo%s(in.%s)", field.Name, stTitle, field.Name))
+
+					structBuiderList = append(structBuiderList, &BuilderNode{
+						BuilderType: BuilderTypeStruct,
+						Typ:         field.Type,
+						St:          findInnerStruct(field.Type.Name, st, tree),
+					})
+				}
+			}
+		}
+		buf.WriteString(withTapAndLF(1, "return out"))
+		buf.WriteString(withTapAndLF(0, "}\n"))
+	case BuilderTypeList:
+		panic("todo list")
+	case BuilderTypeMap:
+		panic("todo map")
 	}
-	buf.WriteString(withTapAndLF(1, "return out"))
-	buf.WriteString(withTapAndLF(0, "}\n"))
 
 	node.Content = buf.String()
 	return structBuiderList
@@ -127,28 +164,53 @@ func isBasicType(t *parser.Type) bool {
 	}
 }
 
-func transPkgName(st *parser.Struct, thriftTree map[string]*parser.Thrift) (string, string) {
+func transPkgName() (string, string) {
 	return oldPkgName, newPkgName
 }
 
-//// map[string][]InnerStruct
-//func unpackType(typ *parser.Type) (string, string, string) {
-//	switch typ.Name {
-//	case "i32", "i64", "bool", "string":
-//		return "%s", "", typ.Name
-//	case "list":
-//		innerFormat, innerAssign, innerType := unpackType(typ.ValueType)
-//		return "[]" + innerFormat, "[]{" + innerAssign + "}", innerType
-//	case "map":
-//		if typ.KeyType.Name != "string" {
-//			panic("unsupported map type")
-//		}
-//		innerFormat, innerAssign, innerType := unpackType(typ.ValueType)
-//		return "map[string]" + innerFormat, "map[string]{"++"}",innerType
-//	default:
-//		return "%s", "", typ.Name
-//	}
-//}
+// map[string][]*pkg.InnerStruct
+func unpackType(typ *parser.Type, pkgName string) string {
+	switch typ.Name {
+	case "list":
+		innerFormat := unpackType(typ.ValueType, pkgName)
+		return "[]" + innerFormat
+	case "map":
+		if typ.KeyType.Name != "string" {
+			panic("unsupported map type")
+		}
+		innerFormat := unpackType(typ.ValueType, pkgName)
+		return "map[string]" + innerFormat
+	default:
+		return fmt.Sprintf("*%s.%s", pkgName, typ.Name)
+	}
+}
+
+func genTitle(pkg string, typ *parser.Type) string {
+	return toCamel(pkg) + genTitleCore(typ)
+}
+func genTitleCore(typ *parser.Type) string {
+	switch typ.Name {
+	case "list":
+		return "List" + genTitleCore(typ.ValueType)
+	case "map":
+		return "Map" + genTitleCore(typ.ValueType)
+	default:
+		return typ.Name
+	}
+}
+
+func getBuilderType(typ *parser.Type) int {
+	if isBasicType(typ) {
+		return BuilderTypeBasic
+	}
+	switch typ.Name {
+	case "list":
+		return BuilderTypeList
+	case "map":
+		return BuilderTypeMap
+	}
+	return BuilderTypeStruct
+}
 
 // todo 不支持嵌套idl的重名结构体
 func findInnerStruct(stName string, root *parser.Struct, thriftTree map[string]*parser.Thrift) *parser.Struct {
