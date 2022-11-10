@@ -4,7 +4,7 @@ namespace go example
 
 struct ExampleRequest {
     1: i32 FieldInt32
-    2: bool FieldBool
+    2: optional bool FieldBool
     3: list<string> FieldListString
     4: map<string,i32> FieldMapStringInt32
     5: InnerAStruct FieldInnerAStruct
@@ -32,5 +32,5 @@ struct ExampleResponse {
 }
 
 service ExampleService {
-    ExampleResponse ExampleFunc(1: ExampleRequest req)
+    ExampleResponse Example(1: ExampleRequest req)
 }

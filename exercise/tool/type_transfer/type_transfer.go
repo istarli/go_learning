@@ -66,6 +66,9 @@ func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.
 
 	oldPkg, newPkg := transPkgName(st, tree)
 	buf.WriteString(withTapAndLF(0, "func transTo%s%s(in *%s.%s) *%s.%s {", toCamel(newPkg), st.Name, oldPkg, st.Name, newPkg, st.Name))
+	buf.WriteString(withTapAndLF(1, "if in == nil {"))
+	buf.WriteString(withTapAndLF(2, "return nil"))
+	buf.WriteString(withTapAndLF(1, "}"))
 	buf.WriteString(withTapAndLF(1, "out := %s.New%s()", newPkg, st.Name))
 	for _, field := range st.Fields {
 		if isBasicType(field.Type) {
@@ -80,7 +83,11 @@ func genStructTypeTransferFuncCore(node *StructBuilder, tree map[string]*parser.
 			structBuiderList = append(structBuiderList, &StructBuilder{St: valSt})
 		} else if field.Type.Name == "map" {
 			if field.Type.KeyType.Name != "string" {
-				continue // todo 仅支持map<string,x>类型
+				panic("仅支持map<string,x>类型") // todo 仅支持map<string,x>类型
+
+			}
+			if field.Type.ValueType.Name == "map" || field.Type.ValueType.Name == "list" {
+				panic("不支持map、list嵌套类型") // todo 不支持map、list嵌套类型
 			}
 			valSt := findInnerStruct(field.Type.ValueType.Name, st, tree)
 			_, newPkg = transPkgName(valSt, tree)
@@ -123,6 +130,25 @@ func isBasicType(t *parser.Type) bool {
 func transPkgName(st *parser.Struct, thriftTree map[string]*parser.Thrift) (string, string) {
 	return oldPkgName, newPkgName
 }
+
+//// map[string][]InnerStruct
+//func unpackType(typ *parser.Type) (string, string, string) {
+//	switch typ.Name {
+//	case "i32", "i64", "bool", "string":
+//		return "%s", "", typ.Name
+//	case "list":
+//		innerFormat, innerAssign, innerType := unpackType(typ.ValueType)
+//		return "[]" + innerFormat, "[]{" + innerAssign + "}", innerType
+//	case "map":
+//		if typ.KeyType.Name != "string" {
+//			panic("unsupported map type")
+//		}
+//		innerFormat, innerAssign, innerType := unpackType(typ.ValueType)
+//		return "map[string]" + innerFormat, "map[string]{"++"}",innerType
+//	default:
+//		return "%s", "", typ.Name
+//	}
+//}
 
 // todo 不支持嵌套idl的重名结构体
 func findInnerStruct(stName string, root *parser.Struct, thriftTree map[string]*parser.Thrift) *parser.Struct {
