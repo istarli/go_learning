@@ -50,7 +50,7 @@ func GenStructTypeTransferFunc(root *parser.Struct, thriftTree map[string]*parse
 	oldPkgName = oldPkg
 	newPkgName = newPkg
 
-	structBuilderList := []*BuilderNode{{St: root}}
+	structBuilderList := []*BuilderNode{{BuilderType: BuilderTypeStruct, St: root, Typ: &parser.Type{Name: root.Name}}}
 
 	pos := 0
 	for pos < len(structBuilderList) {
@@ -96,15 +96,20 @@ func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Th
 					innerType := unpackType(field.Type.ValueType, newPkg)
 					innerTitle := genTitle(newPkg, field.Type.ValueType)
 
-					buf.WriteString(withTapAndLF(1, "out.%s = make([]*%s,0)", field.Name, innerType))
-					buf.WriteString(withTapAndLF(1, "for _,item := range in.%s {", field.Name))
-					buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s,transTo%s(item))", field.Name, field.Name, innerTitle))
+					buf.WriteString(withTapAndLF(1, "out.%s = make([]%s, 0, len(in.%s))", field.Name, innerType, field.Name))
+					buf.WriteString(withTapAndLF(1, "for _, item := range in.%s {", field.Name))
+					buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s, transTo%s(item))", field.Name, field.Name, innerTitle))
 					buf.WriteString(withTapAndLF(1, "}"))
 
-					structBuiderList = append(structBuiderList, &BuilderNode{
+					newNode := &BuilderNode{
 						BuilderType: builderType,
 						Typ:         field.Type.ValueType,
-					})
+					}
+					if builderType == BuilderTypeStruct {
+						newNode.St = findInnerStruct(field.Type.ValueType.Name, st, tree)
+					}
+					structBuiderList = append(structBuiderList, newNode)
+
 				} else if field.Type.Name == "map" {
 					if field.Type.KeyType.Name != "string" {
 						panic("仅支持map<string,x>类型") // todo 仅支持map<string,x>类型
@@ -118,10 +123,14 @@ func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Th
 					buf.WriteString(withTapAndLF(2, "out.%s[key] = transTo%s(val)", field.Name, innerTitle))
 					buf.WriteString(withTapAndLF(1, "}"))
 
-					structBuiderList = append(structBuiderList, &BuilderNode{
+					newNode := &BuilderNode{
 						BuilderType: builderType,
 						Typ:         field.Type.ValueType,
-					})
+					}
+					if builderType == BuilderTypeStruct {
+						newNode.St = findInnerStruct(field.Type.ValueType.Name, st, tree)
+					}
+					structBuiderList = append(structBuiderList, newNode)
 				} else {
 					stTitle := genTitle(newPkg, field.Type)
 

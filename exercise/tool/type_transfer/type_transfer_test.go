@@ -9,8 +9,8 @@ import (
 
 func TestTemp(t *testing.T) {
 	file := "idl/source.thrift"
-	oldPkg, newPkg := "channel_router", "channel_router_zg"
-	methods := []string{"QuerySupportedBankCard"}
+	oldPkg, newPkg := "omega", "bytepay_omega"
+	methods := []string{"Decision", "Notify", "RiskShowOneKeyPayDecision"}
 
 	content := ""
 	for _, method := range methods {
@@ -25,7 +25,7 @@ func TestTemp(t *testing.T) {
 
 func TestTemp2(t *testing.T) {
 	file := "idl/source.thrift"
-	oldPkg, newPkg := "channel_router", "channel_router_zg"
+	oldPkg, newPkg := "member_query", "member_query_zg"
 	structName := "BankCardInfo"
 
 	p := &parser.Parser{}
