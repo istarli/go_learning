@@ -263,10 +263,6 @@ func findInnerStruct(stName string, thriftTree map[string]*parser.Thrift) *parse
 	return nil
 }
 
-func getPkgName(st *parser.Struct, thriftTree map[string]*parser.Thrift) string {
-	return "test_pkg"
-}
-
 func toCamel(s string) string {
 	s = strings.Trim(s, "_")
 	if s == "" {
