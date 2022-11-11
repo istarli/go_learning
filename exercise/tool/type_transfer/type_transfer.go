@@ -21,7 +21,7 @@ const (
 type BuilderNode struct {
 	BuilderType int
 	St          *parser.Struct
-	Typ         *parser.Type
+	Type        *parser.Type
 	Content     string
 }
 
@@ -50,29 +50,27 @@ func GenStructTypeTransferFunc(root *parser.Struct, thriftTree map[string]*parse
 	oldPkgName = oldPkg
 	newPkgName = newPkg
 
-	structBuilderList := []*BuilderNode{{BuilderType: BuilderTypeStruct, St: root, Typ: &parser.Type{Name: root.Name}}}
+	nodeList := []*BuilderNode{{BuilderType: BuilderTypeStruct, St: root, Type: &parser.Type{Name: root.Name}}}
 
 	pos := 0
-	for pos < len(structBuilderList) {
-		item := structBuilderList[pos]
-		if item.Content == "" {
-			structBuilderList = genStructTypeTransferFuncCore(item, thriftTree, structBuilderList)
-		}
+	for pos < len(nodeList) {
+		item := nodeList[pos]
+		nodeList = genStructTypeTransferFuncCore(item, thriftTree, nodeList)
 		pos++
 	}
 
 	var buf strings.Builder
-	for _, item := range structBuilderList {
+	for _, item := range nodeList {
 		buf.WriteString(item.Content)
 	}
 
 	return buf.String()
 }
 
-func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Thrift, structBuiderList []*BuilderNode) []*BuilderNode {
+func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Thrift, nodeList []*BuilderNode) []*BuilderNode {
 	oldPkg, newPkg := transPkgName()
-	oldType, newType := unpackType(node.Typ, oldPkg), unpackType(node.Typ, newPkg)
-	title := genTitle(newPkg, node.Typ)
+	oldType, newType := unpackType(node.Type, oldPkg), unpackType(node.Type, newPkg)
+	title := genTitle(newPkg, node.Type)
 
 	var buf strings.Builder
 	buf.WriteString(withTapAndLF(0, "func transTo%s(in %s) %s {", title, oldType, newType))
@@ -83,9 +81,6 @@ func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Th
 	switch node.BuilderType {
 	case BuilderTypeStruct:
 		st := node.St
-		if st == nil {
-			panic("struct is nil")
-		}
 		buf.WriteString(withTapAndLF(1, "out := %s.New%s()", newPkg, st.Name))
 		for _, field := range st.Fields {
 			if isBasicType(field.Type) {
@@ -97,18 +92,18 @@ func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Th
 					innerTitle := genTitle(newPkg, field.Type.ValueType)
 
 					buf.WriteString(withTapAndLF(1, "out.%s = make([]%s, 0, len(in.%s))", field.Name, innerType, field.Name))
-					buf.WriteString(withTapAndLF(1, "for _, item := range in.%s {", field.Name))
-					buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s, transTo%s(item))", field.Name, field.Name, innerTitle))
+					buf.WriteString(withTapAndLF(1, "for _, val := range in.%s {", field.Name))
+					buf.WriteString(withTapAndLF(2, "out.%s = append(out.%s, transTo%s(val))", field.Name, field.Name, innerTitle))
 					buf.WriteString(withTapAndLF(1, "}"))
 
 					newNode := &BuilderNode{
 						BuilderType: builderType,
-						Typ:         field.Type.ValueType,
+						Type:        field.Type.ValueType,
 					}
 					if builderType == BuilderTypeStruct {
-						newNode.St = findInnerStruct(field.Type.ValueType.Name, st, tree)
+						newNode.St = findInnerStruct(field.Type.ValueType.Name, tree)
 					}
-					structBuiderList = append(structBuiderList, newNode)
+					nodeList = append(nodeList, newNode)
 
 				} else if field.Type.Name == "map" {
 					if field.Type.KeyType.Name != "string" {
@@ -125,35 +120,70 @@ func genStructTypeTransferFuncCore(node *BuilderNode, tree map[string]*parser.Th
 
 					newNode := &BuilderNode{
 						BuilderType: builderType,
-						Typ:         field.Type.ValueType,
+						Type:        field.Type.ValueType,
 					}
 					if builderType == BuilderTypeStruct {
-						newNode.St = findInnerStruct(field.Type.ValueType.Name, st, tree)
+						newNode.St = findInnerStruct(field.Type.ValueType.Name, tree)
 					}
-					structBuiderList = append(structBuiderList, newNode)
+					nodeList = append(nodeList, newNode)
 				} else {
 					stTitle := genTitle(newPkg, field.Type)
 
 					buf.WriteString(withTapAndLF(1, "out.%s = transTo%s(in.%s)", field.Name, stTitle, field.Name))
 
-					structBuiderList = append(structBuiderList, &BuilderNode{
+					nodeList = append(nodeList, &BuilderNode{
 						BuilderType: BuilderTypeStruct,
-						Typ:         field.Type,
-						St:          findInnerStruct(field.Type.Name, st, tree),
+						Type:        field.Type,
+						St:          findInnerStruct(field.Type.Name, tree),
 					})
 				}
 			}
 		}
-		buf.WriteString(withTapAndLF(1, "return out"))
-		buf.WriteString(withTapAndLF(0, "}\n"))
 	case BuilderTypeList:
-		panic("todo list")
+		builderType := getBuilderType(node.Type.ValueType)
+		innerType := unpackType(node.Type.ValueType, newPkg)
+		innerTitle := genTitle(newPkg, node.Type.ValueType)
+
+		buf.WriteString(withTapAndLF(1, "out := make([]%s, 0, len(in))", innerType))
+		buf.WriteString(withTapAndLF(1, "for _, val := range in {"))
+		buf.WriteString(withTapAndLF(2, "out = append(out, transTo%s(val))", innerTitle))
+		buf.WriteString(withTapAndLF(1, "}"))
+
+		newNode := &BuilderNode{
+			BuilderType: builderType,
+			Type:        node.Type.ValueType,
+		}
+		if builderType == BuilderTypeStruct {
+			newNode.St = findInnerStruct(node.Type.ValueType.Name, tree)
+		}
+		nodeList = append(nodeList, newNode)
 	case BuilderTypeMap:
-		panic("todo map")
+		if node.Type.KeyType.Name != "string" {
+			panic("仅支持map<string,x>类型") // todo 仅支持map<string,x>类型
+		}
+		builderType := getBuilderType(node.Type.ValueType)
+		innerType := unpackType(node.Type.ValueType, newPkg)
+		innerTitle := genTitle(newPkg, node.Type.ValueType)
+
+		buf.WriteString(withTapAndLF(1, "out := make(map[string]%s)", innerType))
+		buf.WriteString(withTapAndLF(1, "for key, val := range in {"))
+		buf.WriteString(withTapAndLF(2, "out[key] = transTo%s(val)", innerTitle))
+		buf.WriteString(withTapAndLF(1, "}"))
+
+		newNode := &BuilderNode{
+			BuilderType: builderType,
+			Type:        node.Type.ValueType,
+		}
+		if builderType == BuilderTypeStruct {
+			newNode.St = findInnerStruct(node.Type.ValueType.Name, tree)
+		}
+		nodeList = append(nodeList, newNode)
 	}
+	buf.WriteString(withTapAndLF(1, "return out"))
+	buf.WriteString(withTapAndLF(0, "}\n"))
 
 	node.Content = buf.String()
-	return structBuiderList
+	return nodeList
 }
 
 // isBasicType i32 bool string list<x> map<x,x>  include.x
@@ -222,7 +252,7 @@ func getBuilderType(typ *parser.Type) int {
 }
 
 // todo 不支持嵌套idl的重名结构体
-func findInnerStruct(stName string, root *parser.Struct, thriftTree map[string]*parser.Thrift) *parser.Struct {
+func findInnerStruct(stName string, thriftTree map[string]*parser.Thrift) *parser.Struct {
 	for _, thrift := range thriftTree {
 		for _, st := range thrift.Structs {
 			if st.Name == stName {

@@ -13,8 +13,8 @@ struct ExampleRequest {
 struct InnerAStruct {
     1: i32 FieldInt32
     2: string FieldString
-    3: list<InnerBStruct> FieldListInnerBStruct
-    4: map<string,InnerBStruct> FieldMapInnerBStruct
+//    3: list<InnerBStruct> FieldListInnerBStruct
+    4: map<string,list<map<string,InnerBStruct>>> FieldMapInnerBStruct
 }
 
 struct InnerBStruct {

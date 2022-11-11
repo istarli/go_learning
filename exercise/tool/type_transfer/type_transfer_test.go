@@ -9,8 +9,8 @@ import (
 
 func TestTemp(t *testing.T) {
 	file := "idl/source.thrift"
-	oldPkg, newPkg := "omega", "bytepay_omega"
-	methods := []string{"Decision", "Notify", "RiskShowOneKeyPayDecision"}
+	oldPkg, newPkg := "channel_router", "channel_router_zg"
+	methods := []string{"BatchRoute", "QuerySupportedBankCard"}
 
 	content := ""
 	for _, method := range methods {
@@ -24,9 +24,9 @@ func TestTemp(t *testing.T) {
 }
 
 func TestTemp2(t *testing.T) {
-	file := "idl/source.thrift"
-	oldPkg, newPkg := "member_query", "member_query_zg"
-	structName := "BankCardInfo"
+	file := "idl/example.thrift"
+	oldPkg, newPkg := "pkg", "pkg_new"
+	structName := "ExampleRequest"
 
 	p := &parser.Parser{}
 	thriftTree, absPath, err := p.ParseFile(file)
