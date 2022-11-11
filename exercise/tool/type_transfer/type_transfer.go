@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	oldPkgName = "member_query"
-	newPkgName = "member_query_zg"
+	oldPkgName string
+	newPkgName string
 )
 
 const (
