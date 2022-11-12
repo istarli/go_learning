@@ -196,3 +196,56 @@ func Merge(seq1 []int, seq2 []int) {
 		}
 	}
 }
+
+type RadixSortElem struct {
+	X uint
+	tmp uint
+}
+
+func RadixSort(seq []uint) {
+	length := getLength(seq)
+	helper := make([]*RadixSortElem,0)
+	for _, x := range seq {
+		helper = append(helper, &RadixSortElem{x,x})
+	}
+	for i := 0; i < length; i++ {
+		radixSortTurn(helper)
+	}
+	for i, obj := range helper {
+		seq[i] = obj.X
+	}
+}
+
+func radixSortTurn(seq []*RadixSortElem) {
+	buckets := make([][]*RadixSortElem,0)
+	for i := 0; i < 10; i++ {
+		buckets = append(buckets, []*RadixSortElem{})
+	}
+	for _, obj := range seq {
+		key := obj.tmp%10
+		buckets[key] = append(buckets[key],obj)
+		obj.tmp /= 10
+	}
+	k := 0
+	for _, bucket := range buckets {
+		for _, obj := range bucket {
+			seq[k] = obj
+			k++
+		}
+	}
+}
+
+func getLength(seq []uint) int {
+	max := uint(0)
+	for _, x := range seq {
+		if max < x {
+			max = x
+		}
+	}
+	length := 0
+	for max > 0 {
+		length++
+		max /= 10
+	}
+	return length
+}

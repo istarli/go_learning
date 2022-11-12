@@ -17,6 +17,13 @@ func assertEqualIntSlice(t *testing.T, seq []int, expect []int) {
 		assert.Equal(t, expect[i], seq[i])
 	}
 }
+
+func assertEqualUintSlice(t *testing.T, seq []uint, expect []uint) {
+	for i := range seq {
+		assert.Equal(t, expect[i], seq[i])
+	}
+}
+
 func TestInsertSort(t *testing.T) {
 	seq, expect := defaultSeqs()
 	InsertSort(seq)
@@ -63,4 +70,12 @@ func TestMergeSortNR(t *testing.T) {
 	seq, expect := defaultSeqs()
 	MergeSortNR(seq)
 	assertEqualIntSlice(t, seq, expect)
+}
+
+func TestRadixSort(t *testing.T) {
+	seq := []uint{3,1024,48,15,5894,93,23,66,5,31,5}
+	expect := []uint{3,5,5,15,23,31,48,66,93,1024,5894}
+	RadixSort(seq)
+	t.Log(seq)
+	assertEqualUintSlice(t,seq, expect)
 }
