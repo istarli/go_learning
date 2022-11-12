@@ -1,10 +1,11 @@
 package type_transfer
 
 import (
-	"github.com/samuel/go-thrift/parser"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
+
+	"github.com/samuel/go-thrift/parser"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTemp(t *testing.T) {
