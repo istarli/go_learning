@@ -1,5 +1,4 @@
-test.go
-
+.idea/
 .vscode/
 source.thrift
 base.thrift
