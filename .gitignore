@@ -1,1 +1,6 @@
 test.go
+
+.vscode/
+source.thrift
+base.thrift
+out.txt
